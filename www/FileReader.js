@@ -68,13 +68,14 @@ utils.defineGetter(FileReader.prototype, 'result', function () {
     return this._localURL ? this._result : this._realReader.result;
 });
 
-function defineEvent (eventName) {
+function defineEvent(eventName) {
     utils.defineGetterSetter(FileReader.prototype, eventName, function () {
         return this._realReader[eventName] || null;
     }, function (value) {
         this._realReader[eventName] = value;
     });
 }
+
 defineEvent('onloadstart');    // When the read starts.
 defineEvent('onprogress');     // While reading (and decoding) file or fileBlob data, and reporting partial file data (progress.loaded/progress.total)
 defineEvent('onload');         // When the read has successfully completed.
@@ -82,7 +83,7 @@ defineEvent('onerror');        // When the read has failed (see errors).
 defineEvent('onloadend');      // When the request has completed (either in success or failure).
 defineEvent('onabort');        // When the read has been aborted. For instance, by invoking the abort() method.
 
-function initRead (reader, file) {
+function initRead(reader, file) {
     // Already loading something
     if (reader.readyState === FileReader.LOADING) {
         throw new FileError(FileError.INVALID_STATE_ERR);
@@ -116,7 +117,7 @@ function initRead (reader, file) {
  * @param accumulate A function that takes the callback result and accumulates it in this._result.
  * @param r Callback result returned by the last read exec() call, or null to begin reading.
  */
-function readSuccessCallback (readType, encoding, offset, totalSize, accumulate, r) {
+function readSuccessCallback(readType, encoding, offset, totalSize, accumulate, r) {
     if (this._readyState === FileReader.DONE) {
         return;
     }
@@ -169,7 +170,7 @@ function readSuccessCallback (readType, encoding, offset, totalSize, accumulate,
  * Callback used by the following read* functions to handle errors.
  * Must be bound to the FileReader's this, e.g. readFailureCallback.bind(this)
  */
-function readFailureCallback (e) {
+function readFailureCallback(e) {
     if (this._readyState === FileReader.DONE) {
         return;
     }
@@ -293,6 +294,30 @@ FileReader.prototype.readAsArrayBuffer = function (file) {
         resultArray.set(new Uint8Array(r), this._progress);
         this._result = resultArray.buffer;
     }.bind(this));
+};
+
+/**
+ * Read file with custom accumulate function
+ *
+ * @param file          {File} File object containing file properties
+ * @param Callback      {function} custom accumulate function
+ */
+FileReader.prototype.readAsTextWithCustom = function (file, callback) {
+    if (initRead(this, file)) {
+        return this._realReader.readAsArrayBuffer(file);
+    }
+
+    var totalSize = file.end - file.start;
+    if (typeof callback !== 'function') {
+        callback = function (r) {
+            if (this._progress === 0) {
+                this._result = '';
+            }
+            this._result += r;
+        }
+    }
+
+    readSuccessCallback.bind(this)('readAsText', null, file.start, totalSize, callback.bind(this));
 };
 
 module.exports = FileReader;
